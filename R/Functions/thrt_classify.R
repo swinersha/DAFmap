@@ -1,4 +1,11 @@
-
+#-----------------------------------------
+#
+# Helper functions to classify threat levels
+#
+# Tom Swinfield
+# 17-02-21
+#
+#-----------------------------------------
 
 threat_labels<-c('rendah', 'sedang', 'tinggi', 'extrim')
 

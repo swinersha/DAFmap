@@ -1,5 +1,5 @@
 
-# A function to create a unique colour palateette the same length as teh vector.
+# A function to create a unique colour palatette the same length as teh vector.
 #
 # Tom Swinfield
 # 17-04-11

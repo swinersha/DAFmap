@@ -1,3 +1,16 @@
+#-----------------------------------------
+#
+# Downloads glad data to the local drive
+# It makes an effort to update the raster for the current year if necessary
+# At the beginning of a new year the last years data is archived
+# ... you still need to check this last bit. You should make sure this is the data
+#     for the full year.
+#
+# Tom Swinfield
+# 17-02-21
+#
+#-----------------------------------------
+
 library(lubridate)
 
 
@@ -36,7 +49,7 @@ glad.files<-lapply(years_avail, function(year){
     }
   }
   
-  # There is glad data but still a tempory file from the previous year:
+  # There is glad data but still as a temporary file from the previous year:
   if(glad_exists & !year_test){
   # Make sure the name is just the year
     file_date<-unlist(regmatches(glad_name, gregexpr("[[:digit:]]+", glad_name)))

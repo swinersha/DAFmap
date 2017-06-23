@@ -24,23 +24,42 @@ library(rgeos)
 library(lubridate)
 library(dplyr)
 library(rmarkdown)
+library(tidyr)
+
+sapply(list.files("R/Functions", ".R$", full.names = TRUE), source, .GlobalEnv)
 
 
-source('R/area_lost.R')
-source('R/change_prop_calc.R')
-source('R/col_pal.R')
-source('R/unique.col.R')
-source('R/glad_by_date.R')
-source('R/thrt_classify.R')
+# GLOBAL VARIABLES: ----
 
-sectors<-readOGR("data/shapefiles/Sektor patroli.shp")
-sectors$Area<-sapply(sectors@polygons, function(x) x@area/10000) # The sector Areas in hectares
+# !!!! If you update the sectors in any way...
+# You must set sector_update to TRUE the next time the script is run !!!:
+SECTOR_UPDATE<-FALSE
 
-smart_path<-dirname(file.choose()) #   'data/SMART/2016' # The user should point to the folder which contains the appropriate data.
+PATROL_DAYS_PER_YEAR<-250 # The total number of patrol days at each post.
+HOURS_PER_PATROL<-4
+PATROL_WEIGHT <- c(rendah=1, sedang=3, tinggi=6, extrim=12) 
+# The weighting given to each threat level for calculating the patrol 
+# effort necessary.
+
+smart_path<-dirname(file.choose()) #   'data/SMART/2016' 
+# The user should point to the folder which contains the appropriate data.
 #choose.dir() # Should work for windows  
 
 # Set the analysis period - this must match that in the folder selected above:
 analysis_period<-choose_dates()
+period_days <- as.numeric(analysis_period$to_date-analysis_period$from_date)
+year_prop<-1/(period_days/365)
+
+# Read in the patrol sector shapefile:
+sectors<-readOGR("data/shapefiles/Sektor patroli.shp")
+sectors$Area<-sapply(sectors@polygons, function(x) x@area/10000) # The sector Areas in hectares
+# Ensure that all the sectors have an office:
+sectors@data$Kantor<-as.character(sectors@data$Kantor)
+sectors@data$Kantor[is.na(sectors@data$Kantor)]<-"tanpa_kantor"
+sectors@data$Kantor<-as.factor(sectors@data$Kantor)
+# This wouldn't be necessary if the shapefile was made properly.
+
+
 
 # DEFORESTATION GLAD data -----------------------------
 
@@ -50,20 +69,20 @@ source('R/Download GLAD.R') # The first time this runs it will take a little tim
 glad_period<-glad_by_date(analysis_period$from_date, analysis_period$to_date, sectors)
 
 # Calculate deforestation within sectors:
-sectors$df<-sapply(1:nrow(sectors), function(i) change_prop_calc(glad_period, sectors[i,]))
-period_days <- analysis_period$to_date-analysis_period$from_date
+#sectors$df<-sapply(1:nrow(sectors), function(i) change_prop_calc(glad_period, sectors[i,]))
+sectors$df<-sector_df_assess(sectors, glad_period, sector_update = SECTOR_UPDATE) 
 
 # Convert zeros to NAs:
 glad_period[glad_period==0]<-NA
 
-# Convert current year to an annual % rate.
-# Proportion of year:
-year_prop<-1/(as.numeric(period_days)/365)
+# Convert deforestation in the period to an annual % rate.
 sectors$df<-sectors$df * year_prop
 
 # Classifies the threats:
 df_cut<-c(0,2,5,15,100)
 sectors$df_thrt<-thrt_classify(sectors$df, df_cut) 
+
+
 
 # SMART -----------------------------
 
@@ -72,15 +91,14 @@ effort_header<-names(read.csv(file.path(smart_path, "Patrol_effort_by_sector_000
 effort<-read.csv(paste(smart_path, "/Patrol_effort_by_sector_000054.csv", sep=''), skip=1, head=FALSE)
 names(effort)<-effort_header 
 # Calculate the effort:
-# The column without the 1 is the total distance; 
-# the column with the one is the total number of patrols
 effort_hours<-effort$Number.of.Patrol.Hours[match(sectors$Sector,effort$X)]
 effort_hours[is.na(effort_hours)]<-0
 n_surveys<-effort$Number.of.Patrols[match(sectors$Sector,effort$X)]
 n_surveys[is.na(n_surveys)]<-0
 
-# Adds the patrol effort by distance:
+# Adds the patrol effort to the sectors data:
 sectors$effort_hours<-effort_hours
+sectors$n_surveys<-n_surveys
 
 # Read in the SMART threat data
 encr<-read.csv(file.path(smart_path, "New_encroachment_observations_by_sector_000052.csv"))
@@ -93,12 +111,6 @@ sectors$encr<-encr$Count.Observations.Ancaman[match(sectors$Sector,encr$X)]
 sectors$logg<-logg$Count.Observations.Ancaman[match(sectors$Sector,logg$X)]
 sectors$hunt<-hunt$Count.Observations.Ancaman[match(sectors$Sector,hunt$X)]
 
-#abs_cut<-c(0,1,10,20,100)
-#sectors$encr_abs_thrt<-thrt_classify(sectors$encr, abs_cut) 
-#sectors$logg_abs_thrt<-thrt_classify(sectors$logg, abs_cut)
-#sectors$hunt_abs_thrt<-thrt_classify(sectors$hunt, abs_cut) 
-
-
 # Convert NAs to 0s
 sectors$encr[is.na(sectors$encr)]<-0
 sectors$logg[is.na(sectors$logg)]<-0
@@ -109,38 +121,27 @@ sectors$encr_effort<-sectors$encr/(effort_hours/100)
 sectors$logg_effort<-sectors$logg/(effort_hours/100)
 sectors$hunt_effort<-sectors$hunt/(effort_hours/100)
 
+# An insufficient patrol effort for assessment:
 sectors$no_survey<-effort_hours<4
 
 # Classifies the threats:
 obs_cut<-c(0,1,10,20,100)
-
 sectors$encr_thrt<-thrt_classify(sectors$encr_effort, obs_cut) 
 sectors$logg_thrt<-thrt_classify(sectors$logg_effort, obs_cut)
 sectors$hunt_thrt<-thrt_classify(sectors$hunt_effort, obs_cut) 
 
 
+# Make a spaial object for plotting sector labels: ----
+sectors_centroid<-gCentroid(sectors, byid = TRUE)
+
+
 # Plotting threats ----
 
-# Absolute threat detections
-#par(mfrow=c(2,2), mar=(c(1,1,1,1)))
-#plot(sectors, col=col_pal(sectors$encr, sectors$no_survey), main='Encroachment')
-#plot(sectors, col=col_pal(sectors$logg, sectors$no_survey), main='Illegal logging')
-#plot(sectors, col=col_pal(sectors$hunt, sectors$no_survey), main='Hunting')
-
-
 # The overall threat level map ----
-
-# Number of observations:
-#tmp<-sectors@data[,c("encr_abs_thrt", "logg_abs_thrt", "hunt_abs_thrt", "df_thrt")]
-#sectors$total_thrt_abs <- apply(tmp, 1, function(x) greatest_thrt(x, levels = threat_labels))
 
 # Standardised Threat metric:
 tmp<-sectors@data[,c("encr_thrt", "logg_thrt", "hunt_thrt", "df_thrt")]
 sectors$total_thrt <- apply(tmp, 1, function(x) greatest_thrt(x, levels = threat_labels))
-
-# Finally you need to make sure that you save back into the same folder.
-# Ensure that data can not be overwritten.
-
 
 # Save the threats per sector as a PNG:
 png(filename = file.path(smart_path, "Tingkat ancaman per sektor.png"), 
@@ -168,23 +169,136 @@ legend("bottom",
 dev.off()
 
 # Save the total threats per sector as a PNG:
-png(filename = file.path(smart_path, "Tingkat ancaman total per sektor.png"), 
-    width = 400, height = 400, units = "mm", pointsize = 26,res=600)
-par(mfrow=c(1,1), mar=c(1,1,1,1), oma=c(2,0,0,0))
+png(
+  filename = file.path(smart_path, "Tingkat ancaman total per sektor.png"),
+  width = 400,
+  height = 400,
+  units = "mm",
+  pointsize = 26,
+  res = 600
+)
+par(
+  mfrow = c(1, 1),
+  mar = c(1, 1, 1, 1),
+  oma = c(2, 0, 0, 0)
+)
 plot(sectors,
-     col=col_pal_total_thrt(sectors$total_thrt),
-     main='Total')
+     col = col_pal_total_thrt(sectors$total_thrt),
+     main = 'Total')
+text(sectors_centroid, labels = sectors$Code, cex = 0.5)
 plot_reset()
-legend("bottom", fill = brewer.pal(4, "Blues"), legend = c('Rendah', 'Sedang', 'Tinggi', 'Extrim'), horiz=TRUE, bty="n")
+legend(
+  "bottom",
+  fill = brewer.pal(4, "Blues"),
+  legend = c('Rendah', 'Sedang', 'Tinggi', 'Extrim'),
+  horiz = TRUE,
+  bty = "n"
+)
 dev.off()
+
+# Assessing patrol effor relative to threats ----
+
+#================================================================================================
+# This might need to be deleted, after discussion with Pak Yusup.
+
+# Calculate the patrol days needed for each sector by setting the period by threat level: ----
+
+# 
+# patrol_period <- c(60, 30, 10, 5)
+# sectors$patrol_period <- patrol_period[sectors$total_thrt]
+# sectors$patrol_period[sectors$Prioritas == "Tidak prioritas"] <-
+#   NA # Excludes non priority sectors
+# sectors$patrol_period[sectors$Type == "Pos"] <-
+#   NA # Excludes the posts
+# 
+# 
+# sector_effort <- sectors@data %>%
+#   filter(!is.na(patrol_period)) %>%
+#   group_by(Kantor) %>%
+#   summarise(
+#     n_sektor = length(total_thrt),
+#     n_rendah = sum(total_thrt == "rendah"),
+#     n_sedang = sum(total_thrt == "sedang"),
+#     n_tinggi = sum(total_thrt == "tinggi"),
+#     n_extrim = sum(total_thrt == "extrim"),
+#     hari_patroli_tahun = round(sum(365 / patrol_period))
+#   ) %>%
+#   mutate(
+#     jam_patroli_tahun = hari_patroli_tahun * 4,
+#     jumlah_tim = ceiling(hari_patroli_tahun / PATROL_DAYS_PER_YEAR),
+#     kapasitas_tim = round((
+#       hari_patroli_tahun / (PATROL_DAYS_PER_YEAR * jumlah_tim)
+#     ) * 100)
+#   )
+
+#================================================================================================
+
+# Calculate the patrol days needed for each sector by setting the threat level weighting: ----  
+
+sectors$patrol_weight<-PATROL_WEIGHT[sectors$total_thrt]
+sectors$patrol_weight[sectors$Prioritas=="Tidak prioritas"]<-NA # Excludes non priority sectors
+sectors$patrol_weight[sectors$Type=="Pos"]<-NA # Excludes the posts
+
+# Calculate the number of sectors at each threat level for each field office:
+sector_threat<-sectors@data %>% 
+  filter(!is.na(patrol_weight)) %>%
+  group_by(Kantor) %>%
+  summarise(n_sektor = length(total_thrt),
+            n_rendah = sum(total_thrt=="rendah"),
+            n_sedang = sum(total_thrt=="sedang"),
+            n_tinggi = sum(total_thrt=="tinggi"),
+            n_extrim = sum(total_thrt=="extrim")
+  )
+
+# Calculate the patrol effort required:
+sector_effort<-sector_threat %>%
+  mutate(rendah_w = n_rendah*PATROL_WEIGHT[1],
+         sedang_w = n_sedang*PATROL_WEIGHT[2],
+         tinggi_w = n_tinggi*PATROL_WEIGHT[3],
+         extrim_w = n_extrim*PATROL_WEIGHT[4],
+         total_w = rendah_w+sedang_w+tinggi_w+extrim_w,
+         unit_w = PATROL_DAYS_PER_YEAR / total_w,
+         hari_rendah = round(unit_w*PATROL_WEIGHT[1],1),
+         hari_sedang = round(unit_w*PATROL_WEIGHT[2],1),
+         hari_tinggi = round(unit_w*PATROL_WEIGHT[3],1),
+         hari_extrim = round(unit_w*PATROL_WEIGHT[4],1),
+         periode_rendah = round(period_days/hari_rendah,1),
+         periode_sedang = round(period_days/hari_sedang,1),
+         periode_tinggi = round(period_days/hari_tinggi,1),
+         periode_extrim = round(period_days/hari_extrim,1)) %>%
+  select(Kantor, hari_rendah:periode_extrim)
+
+# Convert wide format to tidy format:
+sector_effort_tidy<-sector_effort %>% 
+  tidyr::gather(thrt, score, hari_rendah:periode_extrim) %>%
+  tidyr::separate(thrt, into=c("type", "total_thrt"), sep="_") %>%
+  tidyr::spread(type,score)
+
+# !!! YOU NEED TO DO SOMETHING ABOUT TANPA KANTOR BECAUSE
+# AT THE MOMENT IT IS GIVEN KPIs BUT IN REALITY NO TEAM 
+# IS ASSIGNED TO DO THE WORK.
+
+# Merge back into sectors:
+
+
+
+sectors_tmp<-merge(sectors@data, sector_effort_tidy, sort = FALSE)
+code_ind<-match(sectors@data$Code, sectors_tmp$Code)
+sectors@data<-sectors_tmp[code_ind,]
+
+sectors$jam<-sectors$hari*HOURS_PER_PATROL # calculate the number of hours rquired.  
+#================================================================================================
+
+
 
 # Save the shapefile:
 writeOGR(sectors, file.path(smart_path, "ancaman_per_sektor.shp"),
          layer="ancaman_per_sektor",
-         driver="ESRI Shapefile")
+         driver="ESRI Shapefile", 
+         overwrite_layer = TRUE)
 
 # Save the shapefile:
 write.csv(sectors@data, file.path(smart_path, "ancaman_per_sektor.csv"))
 
 knitr::opts_chunk$set(echo = FALSE, comment = NA) # Suppress code print out.
-rmarkdown::render("R/Report_gen.R", output_file = file.path(smart_path, "Laporan ancaman")) # Change this to be correct.
+rmarkdown::render("R/Report_gen.R", output_file = file.path(smart_path, "Laporan ancaman.html")) # Change this to be correct.
