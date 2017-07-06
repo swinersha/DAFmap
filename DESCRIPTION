@@ -1,0 +1,29 @@
+Package: DAFmap
+Type: Package
+Title: Direct forest patrols from threats
+Version: 1.0
+Date: 2017-07-05
+Author: Tom Swinfield [aut, cre]
+Maintainer: Tom Swinfield <twswinfield@gmail.com>
+Depends:
+    R (>= 3.1.0),
+    maptools,
+    rgdal,
+    raster,
+    ggplot2,
+    splancs,
+    RColorBrewer,
+    rgeos,
+    lubridate,
+    dplyr,
+    rmarkdown,
+    tidyr
+Description: A tool to integrate forest change alerts from Global
+    Land Analysis and Discovery (GLAD) with forest patrol observations
+    collected and summarised using the software SMART. Threats are
+    summarised within forest patrol sectors, priorities and targets for
+    future patrols calculated and patrol performance can be evaluated.
+    The software automatically produces an output (currently in Bahasa
+    Indonesia).
+License: GNU GPLv3
+RoxygenNote: 5.0.1

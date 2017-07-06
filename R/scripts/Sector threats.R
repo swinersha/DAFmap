@@ -10,9 +10,6 @@
 
 rm(list=ls())
 
-if (!require("pacman")) install.packages("pacman")
-pacman::p_load(maptools, rgdal, raster, splancs, rgeos, lubridate, dplyr, rmarkdown, broom)
-
 # These should be removed if pacman actually works.
 library(maptools)
 library(rgdal)
@@ -24,10 +21,7 @@ library(rgeos)
 library(lubridate)
 library(dplyr)
 library(rmarkdown)
-library(tidyr)
-
-sapply(list.files("R/Functions", ".R$", full.names = TRUE), source, .GlobalEnv)
-
+library(DAFmap)
 
 # GLOBAL VARIABLES: ----
 
@@ -37,7 +31,10 @@ SECTOR_UPDATE<-FALSE
 
 PATROL_DAYS_PER_YEAR<-250 # The total number of patrol days at each post.
 HOURS_PER_PATROL<-4
-PATROL_WEIGHT <- c(rendah=1, sedang=3, tinggi=6, extrim=12) 
+PATROL_WEIGHT <- c(rendah=1, sedang=3, tinggi=6, extrim=12)
+SECTOR_SHP<-"data/shapefiles/Sektor patroli.shp"
+THREAT_LABELS<-c('rendah', 'sedang', 'tinggi', 'extrim')
+
 # The weighting given to each threat level for calculating the patrol 
 # effort necessary.
 
@@ -51,7 +48,7 @@ period_days <- as.numeric(analysis_period$to_date-analysis_period$from_date)
 year_prop<-1/(period_days/365)
 
 # Read in the patrol sector shapefile:
-sectors<-readOGR("data/shapefiles/Sektor patroli.shp")
+sectors<-readOGR(SECTOR_SHP)
 sectors$Area<-sapply(sectors@polygons, function(x) x@area/10000) # The sector Areas in hectares
 # Ensure that all the sectors have an office:
 sectors@data$Kantor<-as.character(sectors@data$Kantor)
@@ -63,7 +60,7 @@ sectors@data$Kantor<-as.factor(sectors@data$Kantor)
 
 # DEFORESTATION GLAD data -----------------------------
 
-source('R/Download GLAD.R') # The first time this runs it will take a little time as new data are downloaded.
+download_GLAD() # The first time this runs it will take a little time as new data are downloaded.
 
 # Select the analysis period:
 glad_period<-glad_by_date(analysis_period$from_date, analysis_period$to_date, sectors)
@@ -80,7 +77,7 @@ sectors$df<-sectors$df * year_prop
 
 # Classifies the threats:
 df_cut<-c(0,2,5,15,100)
-sectors$df_thrt<-thrt_classify(sectors$df, df_cut) 
+sectors$df_thrt<-thrt_classify(sectors$df, df_cut, THREAT_LABELS) 
 
 
 
@@ -126,9 +123,9 @@ sectors$no_survey<-effort_hours<4
 
 # Classifies the threats:
 obs_cut<-c(0,1,10,20,100)
-sectors$encr_thrt<-thrt_classify(sectors$encr_effort, obs_cut) 
-sectors$logg_thrt<-thrt_classify(sectors$logg_effort, obs_cut)
-sectors$hunt_thrt<-thrt_classify(sectors$hunt_effort, obs_cut) 
+sectors$encr_thrt<-thrt_classify(sectors$encr_effort, obs_cut, THREAT_LABELS) 
+sectors$logg_thrt<-thrt_classify(sectors$logg_effort, obs_cut, THREAT_LABELS)
+sectors$hunt_thrt<-thrt_classify(sectors$hunt_effort, obs_cut, THREAT_LABELS) 
 
 
 # Make a spaial object for plotting sector labels: ----
@@ -141,7 +138,7 @@ sectors_centroid<-gCentroid(sectors, byid = TRUE)
 
 # Standardised Threat metric:
 tmp<-sectors@data[,c("encr_thrt", "logg_thrt", "hunt_thrt", "df_thrt")]
-sectors$total_thrt <- apply(tmp, 1, function(x) greatest_thrt(x, levels = threat_labels))
+sectors$total_thrt <- apply(tmp, 1, function(x) greatest_thrt(x, levels = THREAT_LABELS))
 
 # Save the threats per sector as a PNG:
 png(filename = file.path(smart_path, "Tingkat ancaman per sektor.png"), 
@@ -280,16 +277,12 @@ sector_effort_tidy<-sector_effort %>%
 
 # Merge back into sectors:
 
-
-
-sectors_tmp<-merge(sectors@data, sector_effort_tidy, sort = FALSE)
-code_ind<-match(sectors@data$Code, sectors_tmp$Code)
-sectors@data<-sectors_tmp[code_ind,]
+sectors@data<-sp::merge(sectors@data, sector_effort_tidy, sort = FALSE)
+# code_ind<-match(sectors@data$Code, sectors_tmp$Code)
+# sectors@data<-sectors_tmp[code_ind,]
 
 sectors$jam<-sectors$hari*HOURS_PER_PATROL # calculate the number of hours rquired.  
 #================================================================================================
-
-
 
 # Save the shapefile:
 writeOGR(sectors, file.path(smart_path, "ancaman_per_sektor.shp"),
