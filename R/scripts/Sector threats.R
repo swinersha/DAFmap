@@ -294,4 +294,4 @@ writeOGR(sectors, file.path(smart_path, "ancaman_per_sektor.shp"),
 write.csv(sectors@data, file.path(smart_path, "ancaman_per_sektor.csv"))
 
 knitr::opts_chunk$set(echo = FALSE, comment = NA) # Suppress code print out.
-rmarkdown::render("R/Report_gen.R", output_file = file.path(smart_path, "Laporan ancaman.html")) # Change this to be correct.
+rmarkdown::render("R/scripts/Report_gen.R", output_file = file.path(smart_path, "Laporan ancaman.html")) # Change this to be correct.
