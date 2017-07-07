@@ -1,0 +1,75 @@
+---
+title: "DAFmap"
+author: "Tom Swinfield"
+date: "07/07/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+DAFmap is a package that was written specifically to generate maps of forest threats
+to optimise patrol effort allocations and track patrol performance. Maps are
+generated for patrol sectors which are devised to describe the nuances of the area 
+being protected (e.g. forest reserve, national park) in terms of the distibution of 
+patrol teams, the location of settlements and access routes. 
+
+Threats can be measured for a period of intest and are assessed using Global Land
+Analysis and Discovery (GLAD) change alerts in combination with threat observations
+from patrols. 
+
+## Threat assessment
+
+Threats are standardised as % forest loss and as observations per 100 hours of 
+patrolling. Observations should be grouped according to a generic threat type; at
+the moment these are limited to forest clearance (from GLAD), encroachment, illegal
+logging, and hunting, in order to aid interpretation. At present patrol data can be
+uploaded as .csv files describing the number of observations per observation type 
+and the patrol effort in hours within each patrol sector. These can be extracted
+directly from [SMART](http://smartconservationtools.org/) or be created by the user.
+
+Standard threat metrics are then classified into four threat levels (low, medium, 
+high and extreme) using user presecribed cut points. The treat levels can then be
+plotted onto the patrol sectors to give a map of threat intensity. Of course
+this can be done to some in SMART but the advantage of DAFmap is that 
+remote sensing data are directly integrated. The total threat level for each patrol
+sector is calculated according to the maximum threat level observed across all
+observation types. 
+
+## Directing patrols 
+
+Once the treat level has been classified for patrol sectors it is then possible to
+develop priorities for patrolling according to the human resources available. At the
+moment we use field offices as administrative units, which are responsible for 
+several patrol sectors and each have a single patrol team. 
+
+By assigning an importance weighting to each treat level from low to exteme we can
+then calculate the total threat level for all the sectors allocated to each field
+office. From this the number of patrols that should be allocated to each sector
+in order to properly distribute according to threat level is calculated. This is 
+particularly useful because it create a key performance indicator type framework
+for directing patrol effort and assessing the performance of patrol teams.
+
+## Report generation
+
+Template scripts are present which generate an automated report based upon the
+input data. The report shows the threat level both graphically and numerically,
+along with the metrics that go into the threat level calculations and the derived
+key performance indicators.
+
+## Aspirations
+
+At the moment, these scripts are very specific to our site, Hutan Harapan, in
+Sumatra and the reports generated are in Bahasa Indonesia, but I hope that 
+conceptually they are useful to others who face similar problems. Illegal forest
+clearance is a massive problem and it can be extremely difficult to motivate 
+and manage forest patrol teams to directly address this issue, particularly when
+perpetrators and well organised and violent. Any feedback and suggestions would
+be extremely welcome.
+
+I am sorry that no example data are available but my data are sensitive and I don't
+have time to generate some hypothetical data at present. If you need any help
+getting the code to run please don't hesitate in getting in touch. 
