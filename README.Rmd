@@ -1,10 +1,3 @@
----
-title: "DAFmap"
-author: "Tom Swinfield"
-date: "07/07/2017"
-output: html_document
----
-
 ## Introduction
 
 DAFmap is a package that was written specifically to generate maps of forest threats
