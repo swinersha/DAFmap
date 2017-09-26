@@ -4,7 +4,7 @@
 #' then downloads the data into it.
 #' It makes an effort to update the raster for the current year if necessary
 #' At the beginning of a new year the last years data is archived
-#' ... [Note to self] you still need to check this last bit. You should make sure this is the data
+#' ... Note to self you still need to check this last bit. You should make sure this is the data
 #'     for the full year.
 #
 #' 

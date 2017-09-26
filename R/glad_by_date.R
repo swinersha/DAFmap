@@ -111,7 +111,6 @@ period_to_dates <- function(analysis_period) {
 #' creates a pop-up window to select the period of interest.
 #' The options available are analogous to those in SMART.
 #' 
-#' 
 #' @return A list containing the dates the period started (from) and ended (to)
 #' @export
 #' @author Tom Swinfield

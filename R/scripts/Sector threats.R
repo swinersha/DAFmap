@@ -84,8 +84,8 @@ sectors$df_thrt<-thrt_classify(sectors$df, df_cut, THREAT_LABELS)
 # SMART -----------------------------
 
 # Read in the SMART effort data:
-effort_header<-names(read.csv(file.path(smart_path, "Patrol_effort_by_sector_000054.csv")))
-effort<-read.csv(paste(smart_path, "/Patrol_effort_by_sector_000054.csv", sep=''), skip=1, head=FALSE)
+effort_header<-names(read.csv(file.path(smart_path, "Usaha_patroli_per_sektor_000051.csv")))
+effort<-read.csv(paste(smart_path, "/Usaha_patroli_per_sektor_000051.csv", sep=''), skip=1, head=FALSE)
 names(effort)<-effort_header 
 # Calculate the effort:
 effort_hours<-effort$Number.of.Patrol.Hours[match(sectors$Sector,effort$X)]
@@ -98,9 +98,9 @@ sectors$effort_hours<-effort_hours
 sectors$n_surveys<-n_surveys
 
 # Read in the SMART threat data
-encr<-read.csv(file.path(smart_path, "New_encroachment_observations_by_sector_000052.csv"))
-logg<-read.csv(file.path(smart_path, "Illegal_logging_observations_by_sector_000051.csv"))
-hunt<-read.csv(file.path(smart_path, "Hunting_observations_by_sector_000050.csv"))
+encr<-read.csv(file.path(smart_path, "Observasi_perambahan_baru_per_sektor_000058.csv"))
+logg<-read.csv(file.path(smart_path, "Observasi_pembalakan_liar_per_sektor_000057.csv"))
+hunt<-read.csv(file.path(smart_path, "Observasi_perburuan_per_sektor_000056.csv"))
 
 # Add the threat data to the sectors:
 # Threat observations:
@@ -195,41 +195,6 @@ dev.off()
 
 # Assessing patrol effor relative to threats ----
 
-#================================================================================================
-# This might need to be deleted, after discussion with Pak Yusup.
-
-# Calculate the patrol days needed for each sector by setting the period by threat level: ----
-
-# 
-# patrol_period <- c(60, 30, 10, 5)
-# sectors$patrol_period <- patrol_period[sectors$total_thrt]
-# sectors$patrol_period[sectors$Prioritas == "Tidak prioritas"] <-
-#   NA # Excludes non priority sectors
-# sectors$patrol_period[sectors$Type == "Pos"] <-
-#   NA # Excludes the posts
-# 
-# 
-# sector_effort <- sectors@data %>%
-#   filter(!is.na(patrol_period)) %>%
-#   group_by(Kantor) %>%
-#   summarise(
-#     n_sektor = length(total_thrt),
-#     n_rendah = sum(total_thrt == "rendah"),
-#     n_sedang = sum(total_thrt == "sedang"),
-#     n_tinggi = sum(total_thrt == "tinggi"),
-#     n_extrim = sum(total_thrt == "extrim"),
-#     hari_patroli_tahun = round(sum(365 / patrol_period))
-#   ) %>%
-#   mutate(
-#     jam_patroli_tahun = hari_patroli_tahun * 4,
-#     jumlah_tim = ceiling(hari_patroli_tahun / PATROL_DAYS_PER_YEAR),
-#     kapasitas_tim = round((
-#       hari_patroli_tahun / (PATROL_DAYS_PER_YEAR * jumlah_tim)
-#     ) * 100)
-#   )
-
-#================================================================================================
-
 # Calculate the patrol days needed for each sector by setting the threat level weighting: ----  
 
 sectors$patrol_weight<-PATROL_WEIGHT[sectors$total_thrt]
@@ -275,14 +240,17 @@ sector_effort_tidy<-sector_effort %>%
 # AT THE MOMENT IT IS GIVEN KPIs BUT IN REALITY NO TEAM 
 # IS ASSIGNED TO DO THE WORK.
 
-# Merge back into sectors:
 
-sectors@data<-sp::merge(sectors@data, sector_effort_tidy, sort = FALSE)
-# code_ind<-match(sectors@data$Code, sectors_tmp$Code)
-# sectors@data<-sectors_tmp[code_ind,]
 
+
+# Merge back into sectors ----
+
+sectors@data<-sector_assign_kpi(sectors@data, sector_effort_tidy)
 sectors$jam<-sectors$hari*HOURS_PER_PATROL # calculate the number of hours rquired.  
-#================================================================================================
+
+
+
+# Create outputs ----
 
 # Save the shapefile:
 writeOGR(sectors, file.path(smart_path, "ancaman_per_sektor.shp"),
